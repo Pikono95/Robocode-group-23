@@ -4,16 +4,13 @@ import robocode.*;
 import java.awt.Color;
 
 /**
- * Sergenbes - SpinBot by default; switches to Walls behaviour when player count drops to 50%.
+ * Sergenbes - Kamikaze (RamFire) by default; switches to SpinBot when HP drops to 50%.
  */
 public class Sergenbes extends AdvancedRobot {
 
-	private static final double WALLS_THRESHOLD = 0.50;
+	private static final double SPINBOT_HP_THRESHOLD = 50.0; // switch when energy drops below this
 
-	private int     initialOthers    = -1;
-	private boolean wallsInitialized = false;
-	private boolean peek             = false;
-	private double  moveAmount;
+	private int turnDirection = 1;
 
 	public void run() {
 		setBodyColor(Color.blue);
@@ -21,14 +18,11 @@ public class Sergenbes extends AdvancedRobot {
 		setRadarColor(Color.black);
 		setScanColor(Color.yellow);
 
-		initialOthers = getOthers();
-		moveAmount    = Math.max(getBattleFieldWidth(), getBattleFieldHeight());
-
 		while (true) {
-			if (isWallsMode()) {
-				runWalls();
-			} else {
+			if (isSpinBotMode()) {
 				runSpinBot();
+			} else {
+				runKamikaze();
 			}
 		}
 	}
@@ -40,46 +34,36 @@ public class Sergenbes extends AdvancedRobot {
 		ahead(10000);
 	}
 
-	// ── Walls behaviour ──────────────────────────────────────────────────────
-	private void runWalls() {
-		if (!wallsInitialized) {
-			turnLeft(getHeading() % 90);
-			peek = false;
-			ahead(moveAmount);
-			peek = true;
-			turnGunRight(90);
-			turnRight(90);
-			wallsInitialized = true;
-		}
-
-		peek = true;
-		ahead(moveAmount);
-		peek = false;
-		turnRight(90);
+	// ── Kamikaze behaviour ───────────────────────────────────────────────────
+	private void runKamikaze() {
+		turnRight(5 * turnDirection);
 	}
 
 	// ── Helpers ──────────────────────────────────────────────────────────────
-	private boolean isWallsMode() {
-		if (initialOthers <= 0) return false;
-		return (double) getOthers() / initialOthers <= WALLS_THRESHOLD;
+	private boolean isSpinBotMode() {
+		return getEnergy() <= SPINBOT_HP_THRESHOLD;
 	}
 
 	// ── Events ───────────────────────────────────────────────────────────────
 	public void onScannedRobot(ScannedRobotEvent e) {
-		if (!isWallsMode()) {
+		if (isSpinBotMode()) {
 			fire(3);
 			return;
 		}
 
-		// Walls: fire at detected robot
-		fire(2);
-		if (peek) {
-			scan();
+		// Kamikaze: charge at the target
+		if (e.getBearing() >= 0) {
+			turnDirection = 1;
+		} else {
+			turnDirection = -1;
 		}
+		turnRight(e.getBearing());
+		ahead(e.getDistance() + 5);
+		scan();
 	}
 
 	public void onHitRobot(HitRobotEvent e) {
-		if (!isWallsMode()) {
+		if (isSpinBotMode()) {
 			// SpinBot: fire if dead ahead, back off if our fault
 			if (e.getBearing() > -10 && e.getBearing() < 10) {
 				fire(3);
@@ -87,18 +71,28 @@ public class Sergenbes extends AdvancedRobot {
 			if (e.isMyFault()) {
 				back(50);
 			}
-		} else {
-			// Walls: move away from the robot we hit
-			if (e.getBearing() > -90 && e.getBearing() < 90) {
-				back(100);
-			} else {
-				ahead(100);
-			}
+			return;
 		}
-	}
 
-	public void onHitWall(HitWallEvent e) {
-		// Let the walls loop handle re-alignment naturally
-		back(20);
+		// Kamikaze: face the target, fire without killing it, then ram again
+		if (e.getBearing() >= 0) {
+			turnDirection = 1;
+		} else {
+			turnDirection = -1;
+		}
+		turnRight(e.getBearing());
+
+		if (e.getEnergy() > 16) {
+			fire(3);
+		} else if (e.getEnergy() > 10) {
+			fire(2);
+		} else if (e.getEnergy() > 4) {
+			fire(1);
+		} else if (e.getEnergy() > 2) {
+			fire(.5);
+		} else if (e.getEnergy() > .4) {
+			fire(.1);
+		}
+		ahead(40);
 	}
 }
