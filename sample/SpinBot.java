@@ -53,17 +53,4 @@ public class SpinBot extends AdvancedRobot {
 	public void onScannedRobot(ScannedRobotEvent e) {
 		fire(3);
 	}
-
-	/**
-	 * Handles robot collision events by firing at close enemies and adjusting a direction
-	 * if this robot initiated the collision, helping maintain the spinning movement pattern.
-	 */
-	public void onHitRobot(HitRobotEvent e) {
-		if (e.getBearing() > -10 && e.getBearing() < 10) {
-			fire(3);
-		}
-		if (e.isMyFault()) {
-			turnRight(10);
-		}
-	}
 }
